@@ -94,6 +94,9 @@ namespace la3dm {
 
         OcTreeNode &search(point3f p) const;
 
+      void update_color_semantics(float x, float y, float z,
+                                    const Eigen::VectorXf & color, const Eigen::VectorXf & semantic);
+
     private:
         // Loop-Up Table
         static std::unordered_map<OcTreeHashKey, point3f> key_loc_map;

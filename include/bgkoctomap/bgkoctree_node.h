@@ -3,6 +3,11 @@
 
 #include <iostream>
 #include <fstream>
+#include <Eigen/Dense>
+
+#include "FeatureArray.hpp"
+
+#include "PointSegmentedDistribution.hpp"
 
 namespace la3dm {
 
@@ -31,11 +36,11 @@ namespace la3dm {
         /*
          * @brief Constructors and destructor.
          */
-        Occupancy() : m_A(Occupancy::prior_A), m_B(Occupancy::prior_B), state(State::UNKNOWN) { classified = false; }
+      Occupancy() : m_A(Occupancy::prior_A), m_B(Occupancy::prior_B), state(State::UNKNOWN) , color(3), semantics(NUM_CLASSES, true) { classified = false; }
 
         Occupancy(float A, float B);
 
-        Occupancy(const Occupancy &other) : m_A(other.m_A), m_B(other.m_B), state(other.state) { }
+        Occupancy(const Occupancy &other) : m_A(other.m_A), m_B(other.m_B), state(other.state), color(3), semantics(NUM_CLASSES, true) { }
 
         Occupancy &operator=(const Occupancy &other) {
             m_A = other.m_A;
@@ -52,9 +57,12 @@ namespace la3dm {
          * @param kbar kernel density of negative class (unoccupied)
          */
         void update(float ybar, float kbar);
+        void update(const Eigen::VectorXf & feature_new, const Eigen::VectorXf & semantic_new, bool overwrite=false);
 
         /// Get probability of occupancy.
         float get_prob() const;
+        const FeatureArray & get_color() const {return color;}
+        const FeatureArray & get_semantics() const {return semantics;}
 
         /// Get variance of occupancy (uncertainty)
         inline float get_var() const { return (m_A * m_B) / ( (m_A + m_B) * (m_A + m_B) * (m_A + m_B + 1.0f)); }
@@ -80,6 +88,10 @@ namespace la3dm {
         float m_B;
         State state;
 
+        FeatureArray color; // for color features
+        FeatureArray semantics;
+
+
         static float sf2;
         static float ell;   // length-scale
 
@@ -89,6 +101,7 @@ namespace la3dm {
         static float free_thresh;     // FREE occupancy threshold
         static float occupied_thresh; // OCCUPIED occupancy threshold
         static float var_thresh;
+
     };
 
     typedef Occupancy OcTreeNode;

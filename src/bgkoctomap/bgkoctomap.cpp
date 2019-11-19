@@ -364,6 +364,24 @@ namespace la3dm {
 
         rtree.RemoveAll();
     }
+  void BGKOctoMap::insert_semantic_pointcloud(const PCLSemanticPointCloud & cloud, const point3f &origin, float ds_resolution,
+                                              float free_res,
+                                              float max_range) {
+    pcl::PointCloud<pcl::PointXYZ> cloud_xyz;
+    pcl::PointSeg_to_PointXYZ<NUM_CLASSES>(cloud, cloud_xyz);
+    insert_pointcloud(cloud_xyz, origin, ds_resolution, free_res, max_range);
+    for (int i = 0; i < cloud.size(); i++) {
+      auto &p = cloud[i];
+      Block * b = search(block_to_hash_key(point3f(p.x, p.y, p.z)));
+      if (b == nullptr) continue;
+      Eigen::Vector3f rgb;
+      rgb << (float)p.r, (float)(p.g), (float)(p.b);
+      Eigen::VectorXf semantic = Eigen::Map<const Eigen::VectorXf> (p.label_distribution, NUM_CLASSES);
+      b->update_color_semantics(p.x, p.y, p.z, rgb, semantic);
+      
+    }
+  }
+
 
     void BGKOctoMap::get_bbox(point3f &lim_min, point3f &lim_max) const {
         lim_min = point3f(0, 0, 0);

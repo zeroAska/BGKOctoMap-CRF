@@ -1,6 +1,7 @@
 #include "bgkoctree_node.h"
 #include <cmath>
 
+
 namespace la3dm {
 
     /// Default static values
@@ -12,7 +13,7 @@ namespace la3dm {
     float Occupancy::prior_A = 0.5f;
     float Occupancy::prior_B = 0.5f;
 
-    Occupancy::Occupancy(float A, float B) : m_A(Occupancy::prior_A + A), m_B(Occupancy::prior_B + B) {
+  Occupancy::Occupancy(float A, float B) : m_A(Occupancy::prior_A + A), m_B(Occupancy::prior_B + B), color(3), semantics(NUM_CLASSES, true)  {
         classified = false;
         float var = get_var();
         if (var > Occupancy::var_thresh)
@@ -42,6 +43,18 @@ namespace la3dm {
                                                                                                    : State::UNKNOWN);
         }
     }
+
+  void Occupancy::update(
+                         const Eigen::VectorXf & color_new, const Eigen::VectorXf & semantic_new,
+                         bool overwrite) {
+    if (overwrite){
+      color.overwrite_feature(color_new);
+      semantics.overwrite_feature(semantic_new);
+    } else {
+      color.add_observation_by_averaging(color_new);
+      semantics.add_observation_by_averaging(semantic_new);
+    }
+  }
 
     std::ofstream &operator<<(std::ofstream &os, const Occupancy &oc) {
         os.write((char *) &oc.m_A, sizeof(oc.m_A));

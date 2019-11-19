@@ -157,4 +157,14 @@ namespace la3dm {
         get_index(p, x, y, z);
         return operator[](get_node(x, y, z));
     }
+
+  void Block::update_color_semantics(float x, float y, float z,
+                                     const Eigen::VectorXf & color, const Eigen::VectorXf & semantic) {
+    unsigned short xs, ys, zs;
+    get_index(point3f(x,y,z), xs, ys, zs);
+
+    auto hashkey = get_node(xs, ys, zs);
+    auto node = (*this)[hashkey];
+    node.update(color, semantic);
+  }
 }

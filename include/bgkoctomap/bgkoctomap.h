@@ -8,12 +8,16 @@
 #include "rtree.h"
 #include "bgkblock.h"
 #include "bgkoctree_node.h"
+#include "PointSegmentedDistribution.hpp"
 
 namespace la3dm {
 
     /// PCL PointCloud types as input
+
     typedef pcl::PointXYZ PCLPointType;
     typedef pcl::PointCloud<PCLPointType> PCLPointCloud;
+    typedef pcl::PointSegmentedDistribution<NUM_CLASSES> PCLSemanticPoint;
+    typedef pcl::PointCloud<PCLSemanticPoint> PCLSemanticPointCloud;
 
     /*
      * @brief BGKOctoMap
@@ -82,6 +86,9 @@ namespace la3dm {
         void insert_pointcloud(const PCLPointCloud &cloud, const point3f &origin, float ds_resolution,
                                float free_res = 2.0f,
                                float max_range = -1);
+      void insert_semantic_pointcloud(const PCLSemanticPointCloud & cloud, const point3f &origin, float ds_resolution,
+                                      float free_res = 2.0f,
+                                      float max_range = -1);
 
         void insert_training_data(const GPPointCloud &cloud);
 
@@ -259,6 +266,7 @@ namespace la3dm {
                         end_leaf = block_it->second->end_leaf();
                     }
                 }
+                return *this;
             }
 
             OcTreeNode &operator*() const {
