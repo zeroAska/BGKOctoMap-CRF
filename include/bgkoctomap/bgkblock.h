@@ -73,8 +73,8 @@ namespace la3dm {
         }
 
         /// @return center of current Block.
-        inline point3f get_center() const { return center; }
-
+      inline point3f get_center() const { return center; }
+      
         /// @return min lim of current Block.
         inline point3f get_lim_min() const { return center - point3f(size / 2.0f, size / 2.0f, size / 2.0f); }
 

@@ -2,7 +2,7 @@
 #include <pcl/filters/voxel_grid.h>
 #include "bgkoctomap.h"
 #include "bgkinference.h"
-
+#include "densecrf.h"
 using std::vector;
 
 // #define DEBUG true;
@@ -10,6 +10,7 @@ using std::vector;
 #ifdef DEBUG
 
 #include <iostream>
+
 
 #define Debug_Msg(msg) {\
 std::cout << "Debug: " << msg << std::endl; }
@@ -382,6 +383,60 @@ namespace la3dm {
     }
   }
 
+  void BGKOctoMap::dense_crf() {
+    int crf_grid_num_guess=0; //cloud.size();
+    for (auto leaf = begin_leaf(); leaf != end_leaf(); leaf++) {
+      if (leaf.get_node().get_state() == State::OCCUPIED)
+        crf_grid_num_guess++;
+    }
+
+    Eigen::MatrixXf unary_mat(NUM_CLASSES , crf_grid_num_guess);
+    Eigen::MatrixXf rgb_mat(3, crf_grid_num_guess);
+    Eigen::MatrixXf pose_mat(3,  crf_grid_num_guess);
+
+    int counter = 0;
+    std::vector<Occupancy *> crf_ind_to_node(crf_grid_num_guess);
+    for (auto leaf = begin_leaf(); leaf!= end_leaf(); leaf++  ) {
+      auto & node = leaf.get_node();
+      if (node.get_state() != State::OCCUPIED) continue;
+      unary_mat.col(counter) = -(node.get_semantics().get_feature().array().log() );
+      rgb_mat.col(counter) = node.get_color().get_feature();
+      point3f  p = leaf.get_loc();
+      pose_mat.col(counter) << p.x(), p.y(), p.z();
+      crf_ind_to_node[counter] = &node;
+      counter++;
+    }
+
+    // set up crf. The params are taken from Yang's code
+    DenseCRF3D crf_grid_3d(crf_grid_num_guess , NUM_CLASSES );
+    crf_grid_3d.setUnaryEnergy(unary_mat);
+    crf_grid_3d.addPairwiseGaussian( 0.2 , 0.2 , 0.2 , pose_mat ,
+                                     new PottsCompatibility( 3 ) );
+    crf_grid_3d.addPairwiseBilateral(0.2,0.2,0.2, 8,8,8, pose_mat, rgb_mat, new PottsCompatibility(8 ));
+    Eigen::MatrixXf crf_grid_output_prob;
+
+    bool use_high_order = false;
+    int crf_iterations = 5; 
+    if (use_high_order) {
+
+    }  else{
+      crf_grid_output_prob = crf_grid_3d.inference(crf_iterations);
+    }
+
+    assert(crf_grid_output_prob.cols() == crf_grid_num_guess );
+    for (int i = 0; i < crf_grid_output_prob.cols(); i++) {
+      auto &node = *crf_ind_to_node[i];
+      auto new_label = crf_grid_output_prob.col(i);
+      for (int label_id=0;label_id< new_label.rows();label_id++) {
+        if ( new_label(label_id) < 1e-8) // don't want prob to be to small.
+          new_label (label_id) = 1e-8;
+      }
+      new_label.normalize();
+      assert( std::abs(1.0- new_label.sum()) < 0.00001  );
+      Eigen::VectorXf color_new;
+      node.update(color_new, new_label, true);
+    }
+  }
 
     void BGKOctoMap::get_bbox(point3f &lim_min, point3f &lim_max) const {
         lim_min = point3f(0, 0, 0);

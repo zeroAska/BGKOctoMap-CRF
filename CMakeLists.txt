@@ -27,6 +27,7 @@ find_package(catkin REQUIRED COMPONENTS
         nav_msgs
         pcl_ros
         roscpp
+        dense_crf
         octomap_ros
 )
 
@@ -101,7 +102,7 @@ find_package(catkin REQUIRED COMPONENTS
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
   INCLUDE_DIRS include
-#  CATKIN_DEPENDS geometry_msgs pcl_ros roscpp
+ CATKIN_DEPENDS geometry_msgs roscpp dense_crf
 #  DEPENDS system_lib
 )
 
@@ -118,6 +119,7 @@ include_directories(
         include/common
         ${catkin_INCLUDE_DIRS}
         ${OCTOMAP_INCLUDE_DIRS}
+        ${dense_crf_INCLUDE_DIRS}
 )
 
 ## Declare a cpp library

@@ -91,6 +91,7 @@ namespace la3dm {
                                       float max_range = -1);
 
         void insert_training_data(const GPPointCloud &cloud);
+      void dense_crf();
 
         /// Get bounding box of the map.
         void get_bbox(point3f &lim_min, point3f &lim_max) const;

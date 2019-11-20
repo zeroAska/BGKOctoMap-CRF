@@ -43,16 +43,20 @@ namespace la3dm {
                                                                                                    : State::UNKNOWN);
         }
     }
-
+  
   void Occupancy::update(
                          const Eigen::VectorXf & color_new, const Eigen::VectorXf & semantic_new,
                          bool overwrite) {
     if (overwrite){
-      color.overwrite_feature(color_new);
-      semantics.overwrite_feature(semantic_new);
+      if (color_new.size())
+        color.overwrite_feature(color_new);
+      if (semantic_new.size())
+        semantics.overwrite_feature(semantic_new);
     } else {
-      color.add_observation_by_averaging(color_new);
-      semantics.add_observation_by_averaging(semantic_new);
+      if (color_new.size())
+        color.add_observation_by_averaging(color_new);
+      if (semantic_new.size())
+        semantics.add_observation_by_averaging(semantic_new);
     }
   }
 
