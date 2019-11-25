@@ -40,7 +40,9 @@ namespace la3dm {
 
         Occupancy(float A, float B);
 
-        Occupancy(const Occupancy &other) : m_A(other.m_A), m_B(other.m_B), state(other.state), color(3), semantics(NUM_CLASSES, true) { }
+        Occupancy(const Occupancy &other) : m_A(other.m_A), m_B(other.m_B), state(other.state), color(other.color ), semantics(other.semantics ) {
+          
+        }
 
         Occupancy &operator=(const Occupancy &other) {
             m_A = other.m_A;
@@ -63,6 +65,12 @@ namespace la3dm {
         float get_prob() const;
         const FeatureArray & get_color() const {return color;}
         const FeatureArray & get_semantics() const {return semantics;}
+      int get_label() {
+        auto f_vec = semantics.get_feature();
+        int label;
+        f_vec.maxCoeff(&label);
+        return label; 
+      }
 
         /// Get variance of occupancy (uncertainty)
         inline float get_var() const { return (m_A * m_B) / ( (m_A + m_B) * (m_A + m_B) * (m_A + m_B + 1.0f)); }

@@ -3,13 +3,15 @@
 
 #include <unordered_map>
 #include <vector>
+#include <memory>
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
 #include "rtree.h"
 #include "bgkblock.h"
 #include "bgkoctree_node.h"
 #include "PointSegmentedDistribution.hpp"
-
+#include "densecrf.h"
+#include "superpixel.h"
 namespace la3dm {
 
     /// PCL PointCloud types as input
@@ -86,12 +88,26 @@ namespace la3dm {
         void insert_pointcloud(const PCLPointCloud &cloud, const point3f &origin, float ds_resolution,
                                float free_res = 2.0f,
                                float max_range = -1);
-      void insert_semantic_pointcloud(const PCLSemanticPointCloud & cloud, const point3f &origin, float ds_resolution,
+      void insert_semantic_pointcloud(const PCLSemanticPointCloud & cloud,
+                                      const std::vector<SuperPixel *> & super_pixels_2d,
+                                      const std::unordered_map<int, point3f> & uv1d_to_map3d,
+                                      const point3f &origin, float ds_resolution,
                                       float free_res = 2.0f,
                                       float max_range = -1);
 
         void insert_training_data(const GPPointCloud &cloud);
-      void dense_crf();
+      void dense_crf (const std::vector<SuperPixel *> & super_pixels_2d,
+                      const std::unordered_map<int, point3f> & uv1d_to_map3d);
+        void high_order_crf(DenseCRF3D & crf_grid_3d,
+                            const std::vector<SuperPixel *> & super_pixels_2d ,
+                            const std::unordered_map<int, point3f> & uv1d_to_map3d,
+                            std::unordered_map<Occupancy *, int> & node_to_crf_ind,
+                            Eigen::Ref<Eigen::MatrixXf> unary_mat,
+                            Eigen::Ref<Eigen::MatrixXf> rgb_mat,
+                            Eigen::Ref<Eigen::MatrixXf> pose_mat,
+                            Eigen::Ref<Eigen::MatrixXf> crf_grid_output_prob
+                            );
+
 
         /// Get bounding box of the map.
         void get_bbox(point3f &lim_min, point3f &lim_max) const;

@@ -96,7 +96,7 @@ namespace la3dm {
 
       void update_color_semantics(float x, float y, float z,
                                     const Eigen::VectorXf & color, const Eigen::VectorXf & semantic);
-
+      void print_node_color_semantics(float x, float y, float z);
     private:
         // Loop-Up Table
         static std::unordered_map<OcTreeHashKey, point3f> key_loc_map;

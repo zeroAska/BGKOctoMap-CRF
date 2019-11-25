@@ -158,13 +158,29 @@ namespace la3dm {
         return operator[](get_node(x, y, z));
     }
 
+  void Block::print_node_color_semantics(float x, float y, float z) {
+    unsigned short xs, ys, zs;
+    get_index(point3f(x,y,z), xs, ys, zs);
+
+    auto hashkey = get_node(xs, ys, zs);
+    auto &node = (*this)[hashkey];
+    Eigen::VectorXf color = node.get_color().get_feature();
+    Eigen::VectorXf semantics = node.get_semantics().get_feature();
+
+    std::cout<<"Print node: color "<<color.transpose()<<", \n semantic "<<semantics.transpose()<<std::endl;
+    
+  }
+  
   void Block::update_color_semantics(float x, float y, float z,
                                      const Eigen::VectorXf & color, const Eigen::VectorXf & semantic) {
     unsigned short xs, ys, zs;
     get_index(point3f(x,y,z), xs, ys, zs);
 
     auto hashkey = get_node(xs, ys, zs);
-    auto node = (*this)[hashkey];
+    auto & node = (*this)[hashkey];
+    //std::cout<<" before node upadte, the semantics is "<<(*this)[hashkey].get_semantics().get_feature().transpose()<<", and the input semantic is "<<semantic.transpose()<<std::endl;
     node.update(color, semantic);
+
+    //std::cout<<" after node upadte, the semantics becomes "<<(*this)[hashkey].get_semantics().get_feature().transpose()<<std::endl;
   }
 }

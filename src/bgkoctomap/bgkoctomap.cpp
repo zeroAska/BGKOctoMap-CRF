@@ -1,4 +1,6 @@
+#include <cstdio>
 #include <algorithm>
+#include <unordered_map>
 #include <pcl/filters/voxel_grid.h>
 #include "bgkoctomap.h"
 #include "bgkinference.h"
@@ -365,7 +367,10 @@ namespace la3dm {
 
         rtree.RemoveAll();
     }
-  void BGKOctoMap::insert_semantic_pointcloud(const PCLSemanticPointCloud & cloud, const point3f &origin, float ds_resolution,
+  void BGKOctoMap::insert_semantic_pointcloud(const PCLSemanticPointCloud & cloud,
+                                              const std::vector<SuperPixel *> & super_pixels_2d,
+                                              const std::unordered_map<int, point3f> & uv1d_to_map3d,
+                                              const point3f &origin, float ds_resolution,
                                               float free_res,
                                               float max_range) {
     pcl::PointCloud<pcl::PointXYZ> cloud_xyz;
@@ -379,11 +384,116 @@ namespace la3dm {
       rgb << (float)p.r, (float)(p.g), (float)(p.b);
       Eigen::VectorXf semantic = Eigen::Map<const Eigen::VectorXf> (p.label_distribution, NUM_CLASSES);
       b->update_color_semantics(p.x, p.y, p.z, rgb, semantic);
+
+      if (i == 0) {
+           std::cout<<("[insertSemanticPointCloud] point 0:  insert semantic ")<<semantic.transpose()<<std::endl<<"after update node, the semantic becomes " << std::endl ;
+           b->print_node_color_semantics(p.x,p.y,p.z);
+      }
       
     }
+
+    bool is_crf = false;
+    if (is_crf)
+      dense_crf(super_pixels_2d, uv1d_to_map3d );
   }
 
-  void BGKOctoMap::dense_crf() {
+  void BGKOctoMap::high_order_crf(DenseCRF3D & crf_grid_3d,
+                                  const std::vector<SuperPixel *> & super_pixels_2d ,
+                                  const std::unordered_map<int, point3f> & uv1d_to_map3d,
+                                  std::unordered_map<Occupancy *, int> & node_to_crf_ind,
+                                  Eigen::Ref<Eigen::MatrixXf> unary_mat,
+                                  Eigen::Ref<Eigen::MatrixXf> rgb_mat,
+                                  Eigen::Ref<Eigen::MatrixXf> pose_mat,
+                                  Eigen::Ref<Eigen::MatrixXf> crf_grid_output_prob
+                                  ) {
+
+    std::vector<std::shared_ptr<SuperPixel> > grid_3d_superpixels;
+    std::unordered_map< std::shared_ptr<SuperPixel>, std::vector<Occupancy *> > sp3d_to_attached_nodes;
+    for (int i = 0; i < super_pixels_2d.size(); i++) {
+      std::vector<Occupancy *> sp_crf_grid_inds;
+      int sp_crf_grid_num = 0;
+      for (int j=0;j<super_pixels_2d[i]->pixel_indexes.size();j++){
+        //int ux= super_pixels_2d[i]->pixel_indexes[j] % im_width;  // pixel coordinate in one superpixel, horizontal
+        //int uy= super_pixels_2d[i]->pixel_indexes[j] / im_width;  // vertical
+			  
+        //if ( ((ux>im_width-1) || (ux<0)) || ((uy>im_height-1) || (uy<0)) ){
+        //  std::cout<<"pixel index out of image "<<super_pixels_2d[i]->pixel_indexes[j]<<std::endl;
+        //  break;
+        /// }
+
+        if (uv1d_to_map3d.find( super_pixels_2d[i]->pixel_indexes[j] )== uv1d_to_map3d.end()  )
+          continue;
+        auto p = uv1d_to_map3d.find( super_pixels_2d[i]->pixel_indexes[j] )->second;
+        Block *block = search(block_to_hash_key(p));
+        if (block == nullptr) 
+          continue;
+        auto node =  block->search(p) ;
+        if (node.get_state() != State::OCCUPIED) continue;
+        sp_crf_grid_num++;
+        sp_crf_grid_inds.push_back(&node);
+        
+      }
+      if (sp_crf_grid_num>1){
+        std::shared_ptr<SuperPixel> sp_3d( new SuperPixel(sp_crf_grid_num) );
+        for (int k=0;k<sp_crf_grid_num;k++){
+          sp_3d->current_ind=k;
+          //sp_3d->pixel_indexes[k]=sp_crf_grid_inds[k];  // 3d superpixel's indexes stores CRF node index
+          if (sp3d_to_attached_nodes.find(sp_3d) == sp3d_to_attached_nodes.end()  ) {
+            std::vector< Occupancy*> v;
+            sp3d_to_attached_nodes[sp_3d] = v;
+          }
+          sp3d_to_attached_nodes[sp_3d].push_back(sp_crf_grid_inds[k]);
+        }
+        grid_3d_superpixels.push_back(sp_3d);
+      }
+      
+    }
+    int total_sp_grid_num=0;
+    for (int i=0;i<grid_3d_superpixels.size();i++)
+      total_sp_grid_num += grid_3d_superpixels[i]->pixel_indexes.size();
+
+    bool use_hierachical = false;
+    if (use_hierachical) {
+      Eigen::MatrixXf unary_mat_sp(NUM_CLASSES , grid_3d_superpixels.size());
+      Eigen::MatrixXf rgb_mat_sp(3,   grid_3d_superpixels.size());
+      MatrixXf pose_mat_sp(3,  grid_3d_superpixels.size());
+      for (int i=0;i<grid_3d_superpixels.size();i++)
+      {
+        Vector_XXf unary_temp_sum=Vector_XXf::Zero();
+        Vector3f pose_temp_sum=Vector3f::Zero();
+        Vector3f rgb_temp_sum=Vector3f::Zero();
+        int super_size = sp3d_to_attached_nodes[grid_3d_superpixels[i]].size();
+        //int super_size=grid_3d_superpixels[i]->pixel_indexes.size();
+        for (auto  n  : sp3d_to_attached_nodes[grid_3d_superpixels[i]]  )
+        {
+          int px_ind = node_to_crf_ind[n ];
+          unary_temp_sum += unary_mat.col(px_ind);
+          pose_temp_sum += pose_mat.col(px_ind);
+          rgb_temp_sum += rgb_mat.col(px_ind);
+        }
+        unary_mat_sp.col(i)= unary_temp_sum / (float) super_size;
+        pose_mat_sp.col(i)= pose_temp_sum / (float) super_size;
+        rgb_mat_sp.col(i)= rgb_temp_sum / (float) super_size;
+      }
+      // reason superpixel's and grid's label together
+      // the 3 and 4 th pairwise energy is superpixel's.   smooth_xy_stddev   appear_xy_stddev
+      crf_grid_3d.setUnaryEnergy2(unary_mat_sp);
+      crf_grid_3d.addPairwiseGaussian( 0.1, 0.1, 0.1, pose_mat_sp,   //smooth_xy_stddev
+                                       new PottsCompatibility(3 ) );
+      crf_grid_3d.addPairwiseBilateral( 0.1, 0.1, 0.1, 8,8,8,
+                                        pose_mat_sp,rgb_mat_sp,new PottsCompatibility( 8 ));
+
+      //crf_grid_3d.all_3d_superpixels_=grid_3d_superpixels;
+
+      crf_grid_output_prob = crf_grid_3d.inference(5 );
+      
+    }
+    
+  }
+
+  void BGKOctoMap::dense_crf(const std::vector<SuperPixel *> & super_pixels_2d,
+                             const std::unordered_map<int, point3f> & uv1d_to_map3d
+                             ) {
     int crf_grid_num_guess=0; //cloud.size();
     for (auto leaf = begin_leaf(); leaf != end_leaf(); leaf++) {
       if (leaf.get_node().get_state() == State::OCCUPIED)
@@ -393,9 +503,11 @@ namespace la3dm {
     Eigen::MatrixXf unary_mat(NUM_CLASSES , crf_grid_num_guess);
     Eigen::MatrixXf rgb_mat(3, crf_grid_num_guess);
     Eigen::MatrixXf pose_mat(3,  crf_grid_num_guess);
+    //std::unordered_map<int, int> memInd_To_crfInd, crfInd_To_memInd;
 
     int counter = 0;
     std::vector<Occupancy *> crf_ind_to_node(crf_grid_num_guess);
+    std::unordered_map<Occupancy * , int> node_to_crf_ind;
     for (auto leaf = begin_leaf(); leaf!= end_leaf(); leaf++  ) {
       auto & node = leaf.get_node();
       if (node.get_state() != State::OCCUPIED) continue;
@@ -404,6 +516,7 @@ namespace la3dm {
       point3f  p = leaf.get_loc();
       pose_mat.col(counter) << p.x(), p.y(), p.z();
       crf_ind_to_node[counter] = &node;
+      node_to_crf_ind[&node] = counter;
       counter++;
     }
 
@@ -418,13 +531,17 @@ namespace la3dm {
     bool use_high_order = false;
     int crf_iterations = 5; 
     if (use_high_order) {
-
+      crf_grid_3d.set_ho(true );
+      high_order_crf(crf_grid_3d, super_pixels_2d, uv1d_to_map3d,
+                     node_to_crf_ind,
+                     unary_mat, rgb_mat, pose_mat,
+                     crf_grid_output_prob);
     }  else{
       crf_grid_output_prob = crf_grid_3d.inference(crf_iterations);
     }
 
-    assert(crf_grid_output_prob.cols() == crf_grid_num_guess );
-    for (int i = 0; i < crf_grid_output_prob.cols(); i++) {
+    //assert(crf_grid_output_prob.cols() == crf_grid_num_guess );
+    for (int i = 0; i < unary_mat.cols(); i++) {
       auto &node = *crf_ind_to_node[i];
       auto new_label = crf_grid_output_prob.col(i);
       for (int label_id=0;label_id< new_label.rows();label_id++) {

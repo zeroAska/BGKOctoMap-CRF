@@ -16,6 +16,15 @@ namespace la3dm {
 
     };
 
+    FeatureArray(const FeatureArray & other):
+      dimension(other.dimension),
+      counter(other.counter),
+      need_normalizing(other.need_normalizing)
+    {
+      feature  = other.feature;
+      
+    }
+    
     int add_observation_by_averaging(const Eigen::VectorXf & f) {
       if (f.size() == feature.size()){
         feature = ((feature * counter + f)/(counter+1)).eval();

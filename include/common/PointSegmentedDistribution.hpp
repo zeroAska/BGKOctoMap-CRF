@@ -11,7 +11,7 @@
 
 #include <Eigen/Core>
 
-#define NUM_CLASSES 10
+#define NUM_CLASSES 11
 
 namespace pcl {
   template <unsigned int NUM_CLASS>
