@@ -16,6 +16,22 @@ namespace la3dm {
         FREE, OCCUPIED, UNKNOWN, PRUNED
     };
 
+   inline void print_state(const State & s) {
+    if (s == State:: FREE){
+      std::cout<<"Free!\n";
+    }
+    if (s == State:: OCCUPIED){
+      std::cout<<"OCCUPIED!\n";
+    }
+    if (s == State:: UNKNOWN){
+      std::cout<<"UNKNOWN!\n";
+    }
+    if (s == State:: PRUNED){
+      std::cout<<"PRUNED!\n";
+    }
+    
+  }
+
     /*
      * @brief Inference ouputs and occupancy state.
      *
@@ -48,6 +64,8 @@ namespace la3dm {
             m_A = other.m_A;
             m_B = other.m_B;
             state = other.state;
+            color = other.color;
+            semantics = other.semantics;
             return *this;
         }
 

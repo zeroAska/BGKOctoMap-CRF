@@ -3,6 +3,7 @@
 #include <unordered_map>
 #include <pcl/filters/voxel_grid.h>
 #include "bgkoctomap.h"
+#include "bgkoctree_node.h"
 #include "bgkinference.h"
 #include "densecrf.h"
 using std::vector;
@@ -392,19 +393,18 @@ namespace la3dm {
       
     }
 
-    bool is_crf = false;
+    bool is_crf =true;
     if (is_crf)
       dense_crf(super_pixels_2d, uv1d_to_map3d );
   }
 
-  void BGKOctoMap::high_order_crf(DenseCRF3D & crf_grid_3d,
+  Eigen::MatrixXf BGKOctoMap::high_order_crf(DenseCRF3D & crf_grid_3d,
                                   const std::vector<SuperPixel *> & super_pixels_2d ,
                                   const std::unordered_map<int, point3f> & uv1d_to_map3d,
                                   std::unordered_map<Occupancy *, int> & node_to_crf_ind,
                                   Eigen::Ref<Eigen::MatrixXf> unary_mat,
                                   Eigen::Ref<Eigen::MatrixXf> rgb_mat,
-                                  Eigen::Ref<Eigen::MatrixXf> pose_mat,
-                                  Eigen::Ref<Eigen::MatrixXf> crf_grid_output_prob
+                                  Eigen::Ref<Eigen::MatrixXf> pose_mat
                                   ) {
 
     std::vector<std::shared_ptr<SuperPixel> > grid_3d_superpixels;
@@ -412,7 +412,7 @@ namespace la3dm {
     for (int i = 0; i < super_pixels_2d.size(); i++) {
       std::vector<Occupancy *> sp_crf_grid_inds;
       int sp_crf_grid_num = 0;
-      for (int j=0;j<super_pixels_2d[i]->pixel_indexes.size();j++){
+      for (int j=0; j<super_pixels_2d[i]->pixel_indexes.size();j++){
         //int ux= super_pixels_2d[i]->pixel_indexes[j] % im_width;  // pixel coordinate in one superpixel, horizontal
         //int uy= super_pixels_2d[i]->pixel_indexes[j] / im_width;  // vertical
 			  
@@ -427,8 +427,8 @@ namespace la3dm {
         Block *block = search(block_to_hash_key(p));
         if (block == nullptr) 
           continue;
-        auto node =  block->search(p) ;
-        if (node.get_state() != State::OCCUPIED) continue;
+        OcTreeNode & node =  block->search(p) ;
+        if (node.get_state() == State::FREE ) continue;
         sp_crf_grid_num++;
         sp_crf_grid_inds.push_back(&node);
         
@@ -448,12 +448,15 @@ namespace la3dm {
       }
       
     }
+
+    std::cout<<"grid_3d_superpixel size iis "<<grid_3d_superpixels.size()<<std::endl;
     int total_sp_grid_num=0;
     for (int i=0;i<grid_3d_superpixels.size();i++)
       total_sp_grid_num += grid_3d_superpixels[i]->pixel_indexes.size();
 
-    bool use_hierachical = false;
+    bool use_hierachical = true;
     if (use_hierachical) {
+      crf_grid_3d.hierarchical_high_order = true;
       Eigen::MatrixXf unary_mat_sp(NUM_CLASSES , grid_3d_superpixels.size());
       Eigen::MatrixXf rgb_mat_sp(3,   grid_3d_superpixels.size());
       MatrixXf pose_mat_sp(3,  grid_3d_superpixels.size());
@@ -474,18 +477,36 @@ namespace la3dm {
         unary_mat_sp.col(i)= unary_temp_sum / (float) super_size;
         pose_mat_sp.col(i)= pose_temp_sum / (float) super_size;
         rgb_mat_sp.col(i)= rgb_temp_sum / (float) super_size;
+        if (i == 0) {
+          std::cout<<"crf sp input : unary(:,0) \n"<<unary_mat_sp.col(i)
+                   <<"\npoes_mat_sp(:, 0) \n"<<pose_mat_sp.col(i)
+                   <<"\nrgb_mat_sp(:,0) \n"<<rgb_mat_sp.col(i)
+                   <<std::endl;
+          
+        }
       }
       // reason superpixel's and grid's label together
       // the 3 and 4 th pairwise energy is superpixel's.   smooth_xy_stddev   appear_xy_stddev
       crf_grid_3d.setUnaryEnergy2(unary_mat_sp);
+      //      auto pottsG(std::shared_ptr<PottsCompatibility>(new PottsCompatibility(3)) );
+      //auto pottsB(std::shared_ptr<PottsCompatibility>(new PottsCompatibility(8)) );
       crf_grid_3d.addPairwiseGaussian( 0.1, 0.1, 0.1, pose_mat_sp,   //smooth_xy_stddev
-                                       new PottsCompatibility(3 ) );
+                                       new PottsCompatibility(3));
       crf_grid_3d.addPairwiseBilateral( 0.1, 0.1, 0.1, 8,8,8,
-                                        pose_mat_sp,rgb_mat_sp,new PottsCompatibility( 8 ));
+                                        pose_mat_sp,rgb_mat_sp, new PottsCompatibility(8));
 
-      //crf_grid_3d.all_3d_superpixels_=grid_3d_superpixels;
+      std::vector<SuperPixel *> all_3d_superpixels;
+      for (int j = 0; j < grid_3d_superpixels.size(); j++) {
+        all_3d_superpixels.push_back(grid_3d_superpixels[j].get());
+      }
+      
+      crf_grid_3d.all_3d_superpixels_=all_3d_superpixels;
 
-      crf_grid_output_prob = crf_grid_3d.inference(5 );
+      Eigen::MatrixXf result = crf_grid_3d.inference(5 );
+      return result;
+    } else {
+      Eigen::MatrixXf result = crf_grid_3d.inference(5 );
+      return result;
       
     }
     
@@ -495,10 +516,26 @@ namespace la3dm {
                              const std::unordered_map<int, point3f> & uv1d_to_map3d
                              ) {
     int crf_grid_num_guess=0; //cloud.size();
+    std::vector<Occupancy *> crf_ind_to_node;
+    std::unordered_map<Occupancy * , int> node_to_crf_ind;
+    std::vector<point3f> poses;
     for (auto leaf = begin_leaf(); leaf != end_leaf(); leaf++) {
-      if (leaf.get_node().get_state() == State::OCCUPIED)
-        crf_grid_num_guess++;
+      if (leaf.get_node().get_state() == State::OCCUPIED) {
+        
+        point3f p = leaf.get_loc();
+        la3dm::Block * block = search( block_to_hash_key(p));
+        //auto & node = it.get_node();
+        OcTreeNode & node = block->search(p);
+        //        if ( node.get_semantics().get_counter() > 1) {
+          crf_ind_to_node.push_back(&node);
+          node_to_crf_ind[&node] = crf_grid_num_guess ;
+          poses.push_back(point3f(p.x(),p.y(),p.z()));
+          crf_grid_num_guess++;
+          //}
+      }
     }
+
+    std::cout<<"crf_grid_num_guess "<<crf_grid_num_guess<<std::endl;
 
     Eigen::MatrixXf unary_mat(NUM_CLASSES , crf_grid_num_guess);
     Eigen::MatrixXf rgb_mat(3, crf_grid_num_guess);
@@ -506,41 +543,52 @@ namespace la3dm {
     //std::unordered_map<int, int> memInd_To_crfInd, crfInd_To_memInd;
 
     int counter = 0;
-    std::vector<Occupancy *> crf_ind_to_node(crf_grid_num_guess);
-    std::unordered_map<Occupancy * , int> node_to_crf_ind;
-    for (auto leaf = begin_leaf(); leaf!= end_leaf(); leaf++  ) {
-      auto & node = leaf.get_node();
-      if (node.get_state() != State::OCCUPIED) continue;
-      unary_mat.col(counter) = -(node.get_semantics().get_feature().array().log() );
-      rgb_mat.col(counter) = node.get_color().get_feature();
-      point3f  p = leaf.get_loc();
+    //    for (auto leaf = begin_leaf(); leaf!= end_leaf(); leaf++  ) {
+    for (counter = 0 ; counter<crf_grid_num_guess; counter++  ) {
+      Occupancy * node = crf_ind_to_node[counter];
+      //if (node->get_state() != State::OCCUPIED) continue;
+      //if (node->get_semantics().get_counter() < 2) continue;
+      Eigen::VectorXf semantic = node->get_semantics().get_feature();
+
+      semantic = (semantic / semantic.sum()).eval();
+      unary_mat.col(counter) = -semantic.array().log() ;
+      //if (counter == 0)
+
+      rgb_mat.col(counter) = node->get_color().get_feature();
+      //if (node.get_color().get_feature().sum() > 1) {
+      //std::cout<<"unary mat before taking the log: "<<unary_mat.col(counter).transpose()<<std::endl;
+      //std::cout<<"rgb mat is "<<node->get_color().get_feature().transpose()<<std::endl<<std::endl;
+      //}
+      auto p = poses[counter];
       pose_mat.col(counter) << p.x(), p.y(), p.z();
-      crf_ind_to_node[counter] = &node;
-      node_to_crf_ind[&node] = counter;
-      counter++;
-    }
+    } 
 
     // set up crf. The params are taken from Yang's code
+    std::cout<<"Construct crf " <<", counter is "<<counter<<std::endl;;
     DenseCRF3D crf_grid_3d(crf_grid_num_guess , NUM_CLASSES );
+    std::cout<<"Construct crf finish"<<std::endl;
     crf_grid_3d.setUnaryEnergy(unary_mat);
+    //  auto pottsG(std::shared_ptr<PottsCompatibility>(new PottsCompatibility(3)) );
+    //auto pottsB(std::shared_ptr<PottsCompatibility>(new PottsCompatibility(8)) );
     crf_grid_3d.addPairwiseGaussian( 0.2 , 0.2 , 0.2 , pose_mat ,
-                                     new PottsCompatibility( 3 ) );
-    crf_grid_3d.addPairwiseBilateral(0.2,0.2,0.2, 8,8,8, pose_mat, rgb_mat, new PottsCompatibility(8 ));
+                                     new PottsCompatibility(3));
+    crf_grid_3d.addPairwiseBilateral(0.2,0.2,0.2, 8,8,8, pose_mat, rgb_mat, new PottsCompatibility(8));
     Eigen::MatrixXf crf_grid_output_prob;
 
-    bool use_high_order = false;
+    bool use_high_order = true;
     int crf_iterations = 5; 
     if (use_high_order) {
       crf_grid_3d.set_ho(true );
-      high_order_crf(crf_grid_3d, super_pixels_2d, uv1d_to_map3d,
-                     node_to_crf_ind,
-                     unary_mat, rgb_mat, pose_mat,
-                     crf_grid_output_prob);
+      crf_grid_output_prob = high_order_crf(crf_grid_3d, super_pixels_2d, uv1d_to_map3d,
+                                            node_to_crf_ind,
+                                            unary_mat, rgb_mat, pose_mat
+                                            );
     }  else{
       crf_grid_output_prob = crf_grid_3d.inference(crf_iterations);
     }
 
     //assert(crf_grid_output_prob.cols() == crf_grid_num_guess );
+    std::cout<<"Num of cols in crf output is "<<crf_grid_output_prob.cols()<<", num of cols in unary mat is "<<unary_mat.cols()<<std::endl;
     for (int i = 0; i < unary_mat.cols(); i++) {
       auto &node = *crf_ind_to_node[i];
       auto new_label = crf_grid_output_prob.col(i);
@@ -548,11 +596,14 @@ namespace la3dm {
         if ( new_label(label_id) < 1e-8) // don't want prob to be to small.
           new_label (label_id) = 1e-8;
       }
-      new_label.normalize();
+      if (i == 0) std::cout<<"before norm: crf output at i = 0 is "<<new_label.transpose()<<std::endl;
+     new_label = (new_label / new_label.sum() ).eval();
+      if (i == 0) std::cout<<"after norm: crf output at i = 0 is "<<new_label.transpose()<<std::endl;
       assert( std::abs(1.0- new_label.sum()) < 0.00001  );
       Eigen::VectorXf color_new;
       node.update(color_new, new_label, true);
     }
+    std::cout<<"CRF finish\n";
   }
 
     void BGKOctoMap::get_bbox(point3f &lim_min, point3f &lim_max) const {

@@ -3,7 +3,6 @@
 #include <visualization_msgs/MarkerArray.h>
 #include <visualization_msgs/Marker.h>
 #include <std_msgs/ColorRGBA.h>
-
 #include <cmath>
 #include <string>
 
@@ -533,6 +532,8 @@ namespace la3dm  {
         ros::NodeHandle nh;
         ros::Publisher pub;
         visualization_msgs::MarkerArray::Ptr msg;
+
+
         std::string markerarray_frame_id;
         std::string topic;
         float resolution;

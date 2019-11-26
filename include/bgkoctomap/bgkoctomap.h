@@ -98,14 +98,13 @@ namespace la3dm {
         void insert_training_data(const GPPointCloud &cloud);
       void dense_crf (const std::vector<SuperPixel *> & super_pixels_2d,
                       const std::unordered_map<int, point3f> & uv1d_to_map3d);
-        void high_order_crf(DenseCRF3D & crf_grid_3d,
+      Eigen::MatrixXf high_order_crf(DenseCRF3D & crf_grid_3d,
                             const std::vector<SuperPixel *> & super_pixels_2d ,
                             const std::unordered_map<int, point3f> & uv1d_to_map3d,
                             std::unordered_map<Occupancy *, int> & node_to_crf_ind,
                             Eigen::Ref<Eigen::MatrixXf> unary_mat,
                             Eigen::Ref<Eigen::MatrixXf> rgb_mat,
-                            Eigen::Ref<Eigen::MatrixXf> pose_mat,
-                            Eigen::Ref<Eigen::MatrixXf> crf_grid_output_prob
+                            Eigen::Ref<Eigen::MatrixXf> pose_mat
                             );
 
 

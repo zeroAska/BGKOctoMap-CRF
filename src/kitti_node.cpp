@@ -3,16 +3,24 @@
 #include <vector>
 #include <iostream>
 #include <ros/ros.h>
+#include <sensor_msgs/PointCloud2.h>
 #include <opencv2/opencv.hpp>
-
+#include <pcl_ros/point_cloud.h>
+#include <pcl/point_types.h>
+#include <pcl_conversions/pcl_conversions.h>
 #include "bgkoctomap.h"
 #include "markerarray_pub.h"
 #include "kitti_util.h"
 #include "PointSegmentedDistribution.hpp"
+
+
 int main(int argc, char **argv) {
+
+  typedef pcl::PointCloud<pcl::PointXYZRGB> PCLPointCloudRGB;
+  
     ros::init(argc, argv, "kitti_node");
     ros::NodeHandle nh("~");
-
+    ros::Publisher pub = nh.advertise<sensor_msgs::PointCloud2 > ("new_points", 1);
     std::string map_topic("/occupied_cells_vis_array");
     int block_depth = 4;
     double sf2 = 1.0;
@@ -44,6 +52,7 @@ int main(int argc, char **argv) {
     float center_x = 601.8873;
     float center_y = 183.1104;
     float depth_scaling = 2000;
+    int scan_start = 0;
     bool reproject = false;
     bool visualize = false;
 
@@ -58,6 +67,7 @@ int main(int argc, char **argv) {
     nh.param<int>("num_class", num_class, num_class);
     nh.param<double>("free_resolution", free_resolution, free_resolution);
     nh.param<double>("ds_resolution", ds_resolution, ds_resolution);
+    nh.param<int>("scan_start",scan_start, scan_start);
     nh.param<int>("scan_num", scan_num, scan_num);
     nh.param<double>("max_range", max_range, max_range);
 
@@ -131,7 +141,7 @@ int main(int argc, char **argv) {
     la3dm::BGKOctoMap map(resolution, block_depth, num_class, sf2, ell, prior, var_thresh, free_thresh, occupied_thresh);
     la3dm::MarkerArrayPub m_pub(nh, map_topic, 0.1f);
     ros::Time start = ros::Time::now();
-    for (int scan_id = 0; scan_id <= scan_num; ++scan_id) {
+    for (int scan_id = scan_start; scan_id <= scan_num; ++scan_id) {
       //la3dm::PCLPointCloud cloud;
       pcl::PointCloud<pcl::PointSegmentedDistribution<NUM_CLASSES>> cloud;
       la3dm::point3f origin;
@@ -157,30 +167,76 @@ int main(int argc, char **argv) {
       ROS_INFO_STREAM("Scan " << scan_id << " done");
      
       if (reproject)
-        kitti_data.reproject_imgs(scan_id, map); 
-      
+        kitti_data.reproject_imgs(scan_id, map);
+
       if (visualize) {
         m_pub.clear_map(resolution);
         int counter = 0;
+        int total = 0;
+
+        sensor_msgs::PointCloud2 msg;
+        pcl::PointCloud<pcl::PointXYZRGB> rgb;
+        PointSeg_to_PointXYZRGB(cloud, rgb);
+        pcl::toROSMsg(rgb, msg );
+        msg.header.frame_id = "/map";
+        msg.header.stamp = ros::Time::now();
+        pub.publish(msg);
+        
+
+        int unknows = 0;
+        int frees = 0;
+        int occupies = 0;
+        int pruned = 0;
         for (auto it = map.begin_leaf(); it != map.end_leaf(); ++it) {
-          if (it.get_node().get_state() == la3dm::State::OCCUPIED) {
+          total++;
+          if (it.get_node().get_state() == la3dm::State::OCCUPIED) occupies ++;
+          if (it.get_node().get_state() == la3dm::State::UNKNOWN ) unknows ++;
+          if (it.get_node().get_state() == la3dm::State::FREE) frees ++;
+          if (it.get_node().get_state() == la3dm::State::PRUNED ) pruned ++;
+          
+          
+          if (it.get_node().get_state() != la3dm::State::FREE ) {
             la3dm::point3f p = it.get_loc();
             la3dm::Block * block = map.search( la3dm::block_to_hash_key(p));
             //auto & node = it.get_node();
             auto & node = block->search(p);
+            //if (node.get_semantics().get_counter() < 2 )
+            //  continue;
             m_pub.insert_point3d_semantics(p.x(), p.y(), p.z(), it.get_size(), node.get_label(), 1);
-            if (counter == 0) {
-              std::cout<<" the first point at "<<p.x()<<", "<<p.y()<<", "<<p.z()<<" has label "<<node.get_label()<<" with distribtujion "<<node.get_semantics().get_feature().transpose()<<std::endl;
-              counter++;
-            }
+            //if (counter == 0) {
+            //std::cout<<" the first point at "<<p.x()<<", "<<p.y()<<", "<<p.z()<<" has label "<<node.get_label()<<" with distribtujion "<<node.get_semantics().get_feature().transpose()<<std::endl;
+
+              //}
+
+            counter++;
           }
         }
+       
+        static bool query_center = false;
+        if (!query_center) {
+          la3dm::point3f p (3.05, 20.25, 0.25);
+          la3dm::Block * block = map.search( la3dm::block_to_hash_key(p));
+          if (block ) {
+            //auto & node = it.get_node();
+            auto & q_center = block->search(p);
+
+            printf(" query point at 3.05, 20.25, 0.25: label is %d, ", q_center.get_label());
+            print_state(q_center.get_state());
+            
+          }
+        }
+          
+       
+
+        printf("occupies: %d, frees: %d, pruned: %d, unknowns: %d\n", occupies, frees, pruned, unknows);
+        
+        std::cout<<"Total number of cells "<<total<<", useufl "<<counter<<std::endl;
         m_pub.publish();
       }
     }
     ros::Time end = ros::Time::now();
     ROS_INFO_STREAM("Mapping finished in " << (end - start).toSec() << "s");
         
-    ros::spin();
+    //ros::spin();
     return 0;
 }

@@ -228,7 +228,7 @@ public:
         pt.x = (ux - cx_) * (1.0 / fx_) * pix_depth;
         pt.y = (uy - cy_) * (1.0 / fy_) * pix_depth;
         pt.z = pix_depth;
-        uv1d_to_map3d[uy * im_width_ + ux] = la3dm::point3f(pt.x, pt.y, pt.z);
+
         auto pix = color.at<cv::Vec<uint8_t,3> >(uy, ux);
         pt.b = pix[0];
         pt.g = pix[1];
@@ -236,6 +236,7 @@ public:
         pt.label = pix_label + 1;  // NOTE: valid label starts from 0
         memcpy(pt.label_distribution, label_prob_frame_.row(i).data(), sizeof(float)*NUM_CLASS);
         transform_pt_to_global(transform, pt);
+        uv1d_to_map3d[uy * im_width_ + ux] = la3dm::point3f(pt.x, pt.y, pt.z);
         cloud.points.push_back(pt);
       }
     }
@@ -258,7 +259,7 @@ public:
     }
   }
 
-  void reproject_img(const int scan_id, const int reproj_id, la3dm::BGKOctoMap& map) {
+  void reproject_img(const int scan_id, const int reproj_id, const la3dm::BGKOctoMap& map) {
     Eigen::Matrix4f transform = get_current_pose(scan_id);
     for (int32_t i = 0; i < im_width_ * im_height_; ++i) {
       int ux = i % im_width_;
@@ -277,15 +278,24 @@ public:
         pt.x = (ux - cx_) * (1.0 / fx_) * pix_depth;
         pt.y = (uy - cy_) * (1.0 / fy_) * pix_depth;
         pt.z = pix_depth;
+        //std::cout<<"transform pt  "<<pt.x<<", "<<pt.y<<" ,"<<pt.z<<" with tranformation\n";
+        //std::cout<<transform<<std::endl;
         transform_pt_to_global(transform, pt);
-          
-        la3dm::OcTreeNode node = map.search(pt.x, pt.y, pt.z);
-        if (node.get_state() == la3dm::State::OCCUPIED){
+        la3dm::point3f p (pt.x, pt.y, pt.z);
+        auto * block = map.search( la3dm::block_to_hash_key(p));
+            //auto & node = it.get_node();
+        if (block == nullptr) continue;
+        auto & node = block->search(p);
+        //auto node = map.search(p);
+        //printf(" query point at %f,  %f, %f: label is %d, ", pt.x, pt.y, pt.z, node.get_label());
+        //print_state(node.get_state());
+        
+        if (node.get_state() != la3dm::State::FREE ){
           int pix_label = node.get_label();
-          reproj_imgs_label_[reproj_id].at<uint8_t>(uy, ux) = (uint8_t) pix_label - 1;  // Note: valid label starts from 0 for evaluation
-          reproj_imgs_color_[reproj_id].at<cv::Vec3b>(uy, ux)[0] = (uint8_t) label_to_color_(pix_label - 1, 2);
-          reproj_imgs_color_[reproj_id].at<cv::Vec3b>(uy, ux)[1] = (uint8_t) label_to_color_(pix_label - 1, 1);
-          reproj_imgs_color_[reproj_id].at<cv::Vec3b>(uy, ux)[2] = (uint8_t) label_to_color_(pix_label - 1, 0);
+          reproj_imgs_label_[reproj_id].at<uint8_t>(uy, ux) = (uint8_t) pix_label ;  // Note: valid label starts from 0 for evaluation
+          reproj_imgs_color_[reproj_id].at<cv::Vec3b>(uy, ux)[0] = (uint8_t) label_to_color_(pix_label, 2);
+          reproj_imgs_color_[reproj_id].at<cv::Vec3b>(uy, ux)[1] = (uint8_t) label_to_color_(pix_label , 1);
+          reproj_imgs_color_[reproj_id].at<cv::Vec3b>(uy, ux)[2] = (uint8_t) label_to_color_(pix_label , 0);
         }
       }
     }

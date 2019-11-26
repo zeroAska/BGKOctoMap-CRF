@@ -26,6 +26,7 @@ find_package(catkin REQUIRED COMPONENTS
         visualization_msgs
         nav_msgs
         pcl_ros
+        pcl_conversions
         roscpp
         dense_crf
         octomap_ros
@@ -117,6 +118,7 @@ include_directories(
         include/gpoctomap
         include/bgkoctomap
         include/common
+        include/datasets
         ${catkin_INCLUDE_DIRS}
         ${OCTOMAP_INCLUDE_DIRS}
         ${dense_crf_INCLUDE_DIRS}
@@ -159,7 +161,11 @@ add_executable(gpoctomap_static_node
 )
 
 add_executable(octomap_static_node
-    src/octomap/octomap_static_node.cpp)
+  src/octomap/octomap_static_node.cpp)
+
+add_executable(kitti_node
+  ${BGK_SOURCE_FILES}
+  src/kitti_node.cpp)
 
 add_executable(bgkoctomap_server 
     ${BGK_SOURCE_FILES}
@@ -189,7 +195,15 @@ target_link_libraries(gpoctomap_static_node
 target_link_libraries(octomap_static_node
         ${catkin_LIBRARIES}
         ${OCTOMAP_LIBRARIES}
-)
+        )
+
+
+target_link_libraries(kitti_node
+        ${catkin_LIBRARIES}
+        ${OCTOMAP_LIBRARIES}
+        )
+
+      
 
 target_link_libraries(bgkoctomap_server
         ${catkin_LIBRARIES}

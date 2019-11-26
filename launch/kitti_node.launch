@@ -1,13 +1,13 @@
 <launch>
     <arg name="pkg" default="$(find la3dm)" />
     <arg name="method" default="la3dm" />
-    <arg name="dataset" default="kitti_05"/>
-   
+    <arg name="dataset" default="kitti_15"/>
+  
     <arg name="method_config" value="$(arg pkg)/config/methods" />
     <arg name="data_config" value="$(arg pkg)/config/datasets/" />
 
-    <node type="rviz" name="rviz" pkg="rviz" args="-d $(find la3dm)/rviz/kitti_node.rviz" />
-    <node pkg="la3dm" type="kitti_node" name="kitti_node" output="screen" launch-prefix="gdb --args">
+    <?ignore <node type="rviz" name="rviz" pkg="rviz" args="-d $(find la3dm)/rviz/kitti_node.rviz" /> ?>
+    <node pkg="la3dm" type="kitti_node" name="kitti_node" output="screen" launch-prefix="gdb -ex run --args" >
 
         <param name="dir" value="$(arg pkg)/data/data_$(arg dataset)" />
 
