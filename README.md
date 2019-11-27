@@ -2,6 +2,12 @@
 
 This repository performs a CRF semantic voxel map on top of the continuous Bayesian Generalized Kernel Inference occcupancy map, built on top of [BGKOctoMap](https://github.com/RobustFieldAutonomyLab/la3dm), [densecrf](http://vladlen.info/publications/efficient-inference-in-fully-connected-crfs-with-gaussian-edge-potentials/)  and  [semantic_3d_mapping](https://github.com/shichaoy/semantic_3d_mapping). The implementation is intended for the replication of the methods on a few datasets. 
 
+Visualization with `rviz` on Kitti seq15:
+![Kitti15](https://github.com/zeroAska/BGKOctoMap-CRF/raw/crf/config/datasets/visualization_kitti_15.png)
+
+Performance on Kitti as tested on the [BKIOctoMap](https://arxiv.org/abs/1909.04631) paper:
+![Kitti Test Result](https://github.com/zeroAska/BGKOctoMap-CRF/raw/crf/config/datasets/kitti_seq15_seq05_result.png)
+
 
 ## Getting Started
 
@@ -31,7 +37,9 @@ my_catkin_workspace$ source devel/setup.bash
 
 ## Running the Demo
 
-We provide ros launchfiles for kitti seq 05 and kitti seq 15. The format of the dataset follows [semantic_3d_mapping](https://github.com/shichaoy/semantic_3d_mapping). The zip files of kitti seq 15 can be downloaded [here](https://drive.google.com/file/d/1dIHRrsA7rZSRJ6M9Uz_75ZxcHHY96Gmb/view?usp=sharing). Put the files into `data/` folder, e.g. `data/data_kitti_15/`. The launch files is `launch/kitti_node.launch`. The config file is in `config/kitti_15.yaml`.
+We provide ros launchfiles for kitti seq 05 and kitti seq 15. The format of the dataset follows [semantic_3d_mapping](https://github.com/shichaoy/semantic_3d_mapping). The zip files of kitti seq 15 can be downloaded [here](https://drive.google.com/file/d/1dIHRrsA7rZSRJ6M9Uz_75ZxcHHY96Gmb/view?usp=sharing). Put the files into `data/` folder, e.g. `data/data_kitti_15/`. The launch files is `launch/kitti_node.launch`. The config file is in `config/datasets/kitti_15.yaml`. 
+
+If you want to turn on the visualization with `rviz`, set the `visualize` flag in the last line of `config/datasets/kitti_15.yaml` to true. This will increase the memory usage and reduce running speed.
 
 To run the demo on kitti 15:
 
