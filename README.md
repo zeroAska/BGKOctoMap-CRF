@@ -1,6 +1,6 @@
 # BGKOctoMap-CRF
 
-This repository performs a CRF semantic voxel map on top of the continuous Bayesian Generalized Kernel Inference occcupancy map, built on top of [BGKOctoMap](https://github.com/RobustFieldAutonomyLab/la3dm), [densecrf](http://vladlen.info/publications/efficient-inference-in-fully-connected-crfs-with-gaussian-edge-potentials/)  and  [semantic_3d_mapping](https://github.com/shichaoy/semantic_3d_mapping). The implementation is intended for the replication of the methods on a few datasets. 
+This repository extends the continuous [Bayesian Generalized Kernel Inference occcupancy map](https://github.com/RobustFieldAutonomyLab/la3dm) to semantic mapping by performing an additinal a dense [Conditional Random Field](http://vladlen.info/publications/efficient-inference-in-fully-connected-crfs-with-gaussian-edge-potentials/) update on semantic voxels. This repo is a part of the code release from [BKIOctoMap](https://github.com/ganlumomo/BKISemanticMapping), serving as a baseline implementation on public datasets. It uses code from [BGKoctomap](https://github.com/RobustFieldAutonomyLab/la3dm) and [semantic_3d_mapping](https://github.com/shichaoy/semantic_3d_mapping).  
 
 Visualization with `rviz` on Kitti seq15:
 ![Kitti15](https://github.com/zeroAska/BGKOctoMap-CRF/raw/crf/config/datasets/visualization_kitti_15.png)
@@ -51,6 +51,20 @@ which by default will run the full BGKOctoMap-CRF method.
 
 ## Relevant Works and Publications
 
-This repository serves as a baseline of the [BKIOctoMap](https://github.com/ganlumomo/BKISemanticMapping).  It uses code from [BGKOctoMap](https://github.com/RobustFieldAutonomyLab/la3dm), [densecrf](http://vladlen.info/publications/efficient-inference-in-fully-connected-crfs-with-gaussian-edge-potentials/)  and  [semantic_3d_mapping](https://github.com/shichaoy/semantic_3d_mapping).
+This repository serves as a baseline of the [BKIOctoMap](https://github.com/ganlumomo/BKISemanticMapping).  It uses code from [BGKOctoMap](https://github.com/RobustFieldAutonomyLab/la3dm), [densecrf](http://vladlen.info/publications/efficient-inference-in-fully-connected-crfs-with-gaussian-edge-potentials/)  and  [semantic_3d_mapping](https://github.com/shichaoy/semantic_3d_mapping). If you find this repo useful, please cite:
+```
+@ARTICLE{gan2019bayesian,
+author={L. {Gan} and R. {Zhang} and J. W. {Grizzle} and R. M. {Eustice} and M. {Ghaffari}},
+journal={IEEE Robotics and Automation Letters},
+title={Bayesian Spatial Kernel Smoothing for Scalable Dense Semantic Mapping},
+year={2020},
+volume={5},
+number={2},
+pages={790-797},
+keywords={Mapping;semantic scene understanding;range sensing;RGB-D perception},
+doi={10.1109/LRA.2020.2965390},
+ISSN={2377-3774},
+month={April},}
+```
 
 
